@@ -20,8 +20,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -57,23 +57,21 @@ var testData = testStruct{
 	IntList:    []int{1, 2, 3},
 }
 
-func TestVersionedPrinter(t *testing.T) {
+func TestVersionConverter(t *testing.T) {
 	original := &testStruct{Key: "value"}
-	p := NewVersionedPrinter(
-		ResourcePrinterFunc(func(obj runtime.Object, w io.Writer) error {
-			if obj == original {
-				t.Fatalf("object should not be identical: %#v", obj)
-			}
-			if obj.(*testStruct).Key != "value" {
-				t.Fatalf("object was not converted: %#v", obj)
-			}
-			return nil
-		}),
+	p := NewVersionConverter(
 		api.Scheme,
 		testapi.Version(),
 	)
-	if err := p.PrintObj(original, nil); err != nil {
+	obj, err := p.Process(original)
+	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if obj == original {
+		t.Fatalf("object should not be identical: %#v", obj)
+	}
+	if obj.(*testStruct).Key != "value" {
+		t.Fatalf("object was not converted: %#v", obj)
 	}
 }
 
@@ -372,11 +370,12 @@ func TestTemplateStrings(t *testing.T) {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := NewVersionedPrinter(p, api.Scheme, testapi.Version())
+	preprocessor := NewVersionConverter(api.Scheme, testapi.Version())
+	p.AddObjectPreprocessor(preprocessor)
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}
-		err = printer.PrintObj(&item.pod, buffer)
+		err = p.PrintObj(&item.pod, buffer)
 		if err != nil {
 			t.Errorf("%v: unexpected err: %v", name, err)
 			continue
@@ -1088,6 +1087,10 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 	}
 }
 
+func replaceSpacesWithTabs(s string) string {
+	return regexp.MustCompile(" [ ]*").ReplaceAllString(s, "\t")
+}
+
 func TestPrintPodWithLabels(t *testing.T) {
 	tests := []struct {
 		pod          api.Pod
@@ -1137,7 +1140,6 @@ func TestPrintPodWithLabels(t *testing.T) {
 		},
 	}
 
-	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
 		printPod(&test.pod, buf, false, false, false, test.labelColumns)
 		// We ignore time

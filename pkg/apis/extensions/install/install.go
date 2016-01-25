@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -105,6 +106,12 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 	case v1beta1.SchemeGroupVersion:
 		return &meta.VersionInterfaces{
 			Codec:            v1beta1.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	case v1alpha1.SchemeGroupVersion:
+		return &meta.VersionInterfaces{
+			Codec:            v1alpha1.Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
